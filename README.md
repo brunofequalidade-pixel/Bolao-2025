@@ -20,9 +20,22 @@
         <div class="container mx-auto flex flex-col md:flex-row justify-between items-center gap-4">
             <h1 class="text-2xl font-bold flex items-center gap-2"><i class="fas fa-clover"></i> Bolão</h1>
             <input type="text" id="searchInput" placeholder="Pesquisar por nome ou dezena..." class="w-full md:w-1/2 p-2 rounded text-gray-800 focus:outline-none">
-            <button onclick="document.getElementById('adminPanel').classList.toggle('hidden')" class="bg-green-800 px-3 py-1 rounded text-xs border border-green-600">Admin</button>
+            <button onclick="toggleAdminPanel()" class="bg-green-800 px-3 py-1 rounded text-xs border border-green-600">Admin</button>
         </div>
     </nav>
+
+    <!-- Modal de Senha -->
+    <div id="passwordModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+        <div class="bg-white rounded-lg p-6 max-w-sm w-full mx-4 shadow-xl">
+            <h3 class="text-lg font-bold mb-4 text-gray-800">Acesso Administrativo</h3>
+            <input type="password" id="adminPassword" placeholder="Digite a senha" class="w-full p-3 border border-gray-300 rounded mb-4 focus:outline-none focus:border-green-500">
+            <div class="flex gap-2">
+                <button onclick="closePasswordModal()" class="flex-1 bg-gray-300 text-gray-700 px-4 py-2 rounded hover:bg-gray-400 transition">Cancelar</button>
+                <button onclick="checkPassword()" class="flex-1 bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 transition">Entrar</button>
+            </div>
+            <p id="passwordError" class="text-red-500 text-sm mt-2 hidden">Senha incorreta!</p>
+        </div>
+    </div>
 
     <div class="container mx-auto mt-6 px-4">
         <div class="bg-white p-4 rounded-lg shadow-md grid grid-cols-3 gap-2 text-center font-bold">
@@ -71,6 +84,43 @@
         const db = getFirestore(app);
         let allParticipants = [];
         let currentDraw = [];
+        let isAdminAuthenticated = false;
+
+        // Funções de autenticação admin
+        window.toggleAdminPanel = () => {
+            if (isAdminAuthenticated) {
+                document.getElementById('adminPanel').classList.toggle('hidden');
+            } else {
+                document.getElementById('passwordModal').classList.remove('hidden');
+                document.getElementById('adminPassword').focus();
+            }
+        };
+
+        window.closePasswordModal = () => {
+            document.getElementById('passwordModal').classList.add('hidden');
+            document.getElementById('adminPassword').value = '';
+            document.getElementById('passwordError').classList.add('hidden');
+        };
+
+        window.checkPassword = () => {
+            const password = document.getElementById('adminPassword').value;
+            if (password === 'bolao2025') {
+                isAdminAuthenticated = true;
+                closePasswordModal();
+                document.getElementById('adminPanel').classList.remove('hidden');
+            } else {
+                document.getElementById('passwordError').classList.remove('hidden');
+                document.getElementById('adminPassword').value = '';
+                document.getElementById('adminPassword').focus();
+            }
+        };
+
+        // Enter no campo de senha
+        document.addEventListener('DOMContentLoaded', () => {
+            document.getElementById('adminPassword').addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') checkPassword();
+            });
+        });
 
         function parseNumbersFromLine(row) {
             // Converte todas as células (exceto a primeira) para string e extrai números
