@@ -316,6 +316,12 @@
                 container.appendChild(card);
             });
 
+            console.log(`📈 Total de participantes encontrados: ${foundCount}`);
+            
+            if (foundCount === 0) {
+                container.innerHTML = '<div class="col-span-full text-center py-10 text-gray-500"><i class="fas fa-search fa-2x mb-2"></i><p>Nenhum resultado encontrado</p></div>';
+            }
+
             updateStats(stats);
         }
 
