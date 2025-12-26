@@ -109,20 +109,35 @@
                     let debugInfo = [];
                     
                     rows.forEach((row, index) => {
+                        // Pula linhas completamente vazias
+                        if (!row || row.length === 0 || row.every(cell => !cell)) {
+                            debugInfo.push(`Linha ${index} ignorada: linha vazia`);
+                            skipped++;
+                            return;
+                        }
+
                         const nome = row[0] ? row[0].toString().trim() : "";
                         
                         // Debug: registra todas as linhas
-                        console.log(`Linha ${index}:`, { nome, row });
+                        console.log(`Linha ${index}:`, { nome, totalColunas: row.length, dados: row });
                         
-                        // Ignora linhas vazias ou cabeçalhos óbvios
-                        if (!nome || nome.toLowerCase() === "nome" || nome.toLowerCase() === "participante") {
-                            debugInfo.push(`Linha ${index} ignorada: cabeçalho ou vazia`);
+                        // Ignora apenas cabeçalhos óbvios (comparação exata)
+                        const nomeLower = nome.toLowerCase();
+                        if (!nome || nomeLower === "nome" || nomeLower === "participante" || nomeLower === "apostador") {
+                            debugInfo.push(`Linha ${index} ignorada: cabeçalho "${nome}"`);
                             skipped++;
                             return;
                         }
 
                         const todosNumeros = parseNumbersFromLine(row);
                         console.log(`${nome} - Total de números encontrados:`, todosNumeros.length, todosNumeros);
+                        
+                        // Validação: precisa ter pelo menos 6 números
+                        if (todosNumeros.length < 6) {
+                            debugInfo.push(`✗ ${nome}: apenas ${todosNumeros.length} número(s) - mínimo 6`);
+                            skipped++;
+                            return;
+                        }
                         
                         let validBets = [];
                         // Agrupa de 6 em 6
@@ -135,21 +150,24 @@
 
                         if (validBets.length > 0) {
                             try {
+                                // Converte array de arrays para array de objetos (Firestore não aceita arrays aninhados)
+                                const betsForFirestore = validBets.map(bet => ({ numbers: bet }));
+                                
                                 // Cria um documento com ID único
                                 const docRef = doc(collection(db, "participants"));
                                 batch.set(docRef, { 
                                     name: nome, 
-                                    bets: validBets
+                                    bets: betsForFirestore
                                 });
                                 count++;
-                                debugInfo.push(`✓ ${nome}: ${validBets.length} jogo(s)`);
+                                debugInfo.push(`✓ ${nome}: ${validBets.length} jogo(s) válido(s)`);
                             } catch (batchError) {
                                 console.error(`Erro ao adicionar ${nome}:`, batchError);
                                 debugInfo.push(`✗ ${nome}: erro ao adicionar - ${batchError.message}`);
                                 skipped++;
                             }
                         } else {
-                            debugInfo.push(`✗ ${nome}: nenhum jogo válido (${todosNumeros.length} números)`);
+                            debugInfo.push(`✗ ${nome}: números insuficientes (${todosNumeros.length} encontrados, múltiplos de 6 necessários)`);
                             skipped++;
                         }
                     });
@@ -204,21 +222,31 @@
 
             // Ordenação: quem tem mais acertos primeiro
             const sortedList = [...allParticipants].sort((a, b) => {
-                const maxA = Math.max(...a.bets.map(bet => bet.filter(n => currentDraw.includes(n)).length));
-                const maxB = Math.max(...b.bets.map(bet => bet.filter(n => currentDraw.includes(n)).length));
+                const maxA = Math.max(...a.bets.map(bet => {
+                    const nums = bet.numbers || bet; // Suporta ambos os formatos
+                    return nums.filter(n => currentDraw.includes(n)).length;
+                }));
+                const maxB = Math.max(...b.bets.map(bet => {
+                    const nums = bet.numbers || bet;
+                    return nums.filter(n => currentDraw.includes(n)).length;
+                }));
                 return maxB - maxA;
             });
 
             sortedList.forEach(p => {
                 const matchesSearch = p.name.toLowerCase().includes(search) || 
-                                    p.bets.some(b => b.some(n => n.toString() == search));
+                                    p.bets.some(b => {
+                                        const nums = b.numbers || b;
+                                        return nums.some(n => n.toString() == search);
+                                    });
                 if (search && !matchesSearch) return;
 
                 const card = document.createElement('div');
                 card.className = "bg-white p-4 rounded-lg shadow-sm hover:shadow-md transition border border-gray-200";
                 
                 let betsHtml = p.bets.map((bet, idx) => {
-                    const hits = bet.filter(n => currentDraw.includes(n)).length;
+                    const nums = bet.numbers || bet; // Suporta ambos os formatos (objeto ou array)
+                    const hits = nums.filter(n => currentDraw.includes(n)).length;
                     if (hits === 6) stats.sena++; else if (hits === 5) stats.quina++; else if (hits === 4) stats.quadra++;
                     
                     let bg = hits === 6 ? 'sena-bg' : hits === 5 ? 'quina-bg' : hits === 4 ? 'quadra-bg' : 'bg-gray-50';
@@ -226,7 +254,7 @@
                         <div class="p-2 rounded mb-2 ${bg} transition-colors">
                             <div class="text-[10px] text-gray-400 mb-1 font-bold uppercase">Jogo ${idx+1} • ${hits} acertos</div>
                             <div class="flex flex-wrap gap-1.5 justify-center">
-                                ${bet.map(n => `<span class="w-7 h-7 flex items-center justify-center rounded-full text-xs border ${currentDraw.includes(n) ? 'hit-number' : 'bg-white border-gray-200'}">${n.toString().padStart(2,'0')}</span>`).join('')}
+                                ${nums.map(n => `<span class="w-7 h-7 flex items-center justify-center rounded-full text-xs border ${currentDraw.includes(n) ? 'hit-number' : 'bg-white border-gray-200'}">${n.toString().padStart(2,'0')}</span>`).join('')}
                             </div>
                         </div>`;
                 }).join('');
