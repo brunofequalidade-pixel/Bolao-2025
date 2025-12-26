@@ -316,9 +316,52 @@
                 container.appendChild(card);
             });
 
+            updateStats(stats);
+        }
+
+        function updateStats(stats) {
             document.getElementById('countSena').innerText = stats.sena;
             document.getElementById('countQuina').innerText = stats.quina;
             document.getElementById('countQuadra').innerText = stats.quadra;
+        }
+
+        function renderAllParticipants(container, stats) {
+            const sortedList = [...allParticipants].sort((a, b) => {
+                const maxA = Math.max(...a.bets.map(bet => {
+                    const nums = bet.numbers || bet;
+                    return nums.filter(n => currentDraw.includes(n)).length;
+                }));
+                const maxB = Math.max(...b.bets.map(bet => {
+                    const nums = bet.numbers || bet;
+                    return nums.filter(n => currentDraw.includes(n)).length;
+                }));
+                return maxB - maxA;
+            });
+
+            sortedList.forEach(p => {
+                const card = document.createElement('div');
+                card.className = "bg-white p-4 rounded-lg shadow-sm hover:shadow-md transition border border-gray-200";
+                
+                let betsHtml = p.bets.map((bet, idx) => {
+                    const nums = bet.numbers || bet;
+                    const hits = nums.filter(n => currentDraw.includes(n)).length;
+                    if (hits === 6) stats.sena++; else if (hits === 5) stats.quina++; else if (hits === 4) stats.quadra++;
+                    
+                    let bg = hits === 6 ? 'sena-bg' : hits === 5 ? 'quina-bg' : hits === 4 ? 'quadra-bg' : 'bg-gray-50';
+                    return `
+                        <div class="p-2 rounded mb-2 ${bg} transition-colors">
+                            <div class="text-[10px] text-gray-400 mb-1 font-bold uppercase">Jogo ${idx+1} • ${hits} acertos</div>
+                            <div class="flex flex-wrap gap-1.5 justify-center">
+                                ${nums.map(n => `<span class="w-7 h-7 flex items-center justify-center rounded-full text-xs border ${currentDraw.includes(n) ? 'hit-number' : 'bg-white border-gray-200'}">${n.toString().padStart(2,'0')}</span>`).join('')}
+                            </div>
+                        </div>`;
+                }).join('');
+
+                card.innerHTML = `<h3 class="font-bold text-gray-700 border-b mb-3 pb-1 truncate">${p.name}</h3>${betsHtml}`;
+                container.appendChild(card);
+            });
+
+            updateStats(stats);
         }
 
         document.getElementById('searchInput').addEventListener('input', render);
